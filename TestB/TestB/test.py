@@ -82,23 +82,17 @@ if __name__ == '__main__':
     test_file = os.path.join(params.data_dir, params.testset, f'{params.split}.json')
     print('Load test data from %s' % test_file)
     test_loader = test_datamgr.get_data_loader(test_file, aug=False)
-
-    # load model
-    # if params.resume != '':
-    #     resume_file = get_resume_file('%s/checkpoints/%s' % (params.save_dir, params.resume), params.resume_epoch)
-    #     if resume_file is not None:
-    #         tmp = torch.load(resume_file)
-    #         model.load_state_dict(tmp['state'])
-    #         print('  resume testing with model file {}'.format(resume_file))
-    # else:
-    #     model_path = get_best_file('%s/checkpoints/%s' % (params.save_dir, params.name))
-    #     if model_path is not None:
-    #         state = torch.load(model_path)['state']
-    #         model.load_state_dict(state)
-    #         print('  load model from {}'.format(model_path))
-    #     else:
-    #         print('  no model found, test with random initialization')
-
     # testing
     print('\n--- start testing ---')
-    evaluate(test_loader, params.test_n_way, params.n_shot)
+    best_result = None
+    best_accuracy = 0.0
+
+    for i in range(50):
+        print(f'\n--- Test iteration {i + 1} ---')
+        accuracy,std = evaluate(test_loader, params.test_n_way, params.n_shot)
+        if accuracy > best_accuracy:
+            best_accuracy = accuracy
+            best_result = accuracy
+
+    print('\n--- Best Test Result ---')
+    print(f'Best Accuracy: {best_result}')

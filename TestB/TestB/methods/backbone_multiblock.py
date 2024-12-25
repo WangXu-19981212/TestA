@@ -601,7 +601,7 @@ model_dict = dict(Conv4=Conv4,
                   ResNet34=ResNet34)
 
 if __name__ == '__main__':
-    model_func = model_dict['ResNet10']
+    model_func = model_dict['ResNet18']
     net = model_func(flatten=True, leakyrelu=False)
     from torch.autograd import Variable
 

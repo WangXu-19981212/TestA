@@ -198,7 +198,9 @@ class MainMethod(MetaTemplate):
             index = torch.randint(0, len(epsilon_list), (1,))[0]
             epsilon = epsilon_list[index]
 
-            adv_frequency_block1 = add_perturbation(LL_block1, epsilon, grad_LL_block1)
+            adv_frequency_pgd = pgd_attack(LL_block1, epsilon, grad_LL_block1, 30, 0.001)
+            adv_frequency_fgsm = fgsm_attack(LL_block1, epsilon, grad_LL_block1)
+            adv_frequency_block1 = (adv_frequency_pgd + adv_frequency_fgsm) / 2.0
 
         # add zero_grad
         self.feature.zero_grad()
@@ -244,7 +246,9 @@ class MainMethod(MetaTemplate):
             # fgsm style attack
             index = torch.randint(0, len(epsilon_list), (1,))[0]
             epsilon = epsilon_list[index]
-            adv_frequency_block2 = add_perturbation(LL_block2, epsilon, grad_LL_block2)
+            adv_frequency_pgd = pgd_attack(LL_block2, epsilon, grad_LL_block2, 30, 0.001)
+            adv_frequency_fgsm = fgsm_attack(LL_block2, epsilon, grad_LL_block2)
+            adv_frequency_block2 = (adv_frequency_pgd + adv_frequency_fgsm) / 2.0
             # print(f"phase_spectrum_block2.grad_fn: {phase_spectrum_block2.grad_fn}")
             # print(f"ori_loss.grad_fn: {ori_loss.grad_fn}")
             # print(f"x_ori_block2.grad_fn: {x_ori_block2.grad_fn}")
@@ -294,7 +298,9 @@ class MainMethod(MetaTemplate):
             # fgsm style attack
             index = torch.randint(0, len(epsilon_list), (1,))[0]
             epsilon = epsilon_list[index]
-            adv_frequency_block3 = add_perturbation(LL_block3, epsilon, grad_LL_block3)
+            adv_frequency_pgd = pgd_attack(LL_block3, epsilon, grad_LL_block3, 30, 0.001)
+            adv_frequency_fgsm = fgsm_attack(LL_block3, epsilon, grad_LL_block3)
+            adv_frequency_block3 = (adv_frequency_pgd + adv_frequency_fgsm) / 2.0
         # print("))))))))))))))))))))))))))", adv_frequency_block1, adv_frequency_block2, adv_frequency_block3)
 
         return adv_frequency_block1, adv_frequency_block2, adv_frequency_block3, low_freq_ratio, high_freq_ratio
@@ -358,7 +364,9 @@ class MainMethod(MetaTemplate):
             index = torch.randint(0, len(epsilon_list), (1,))[0]
             epsilon = epsilon_list[index]
 
-            adv_frequency_block1 = add_perturbation_high(HH_block1, epsilon, grad_HH_block1)
+            adv_frequency_pgd = pgd_attack(HH_block1, epsilon, grad_HH_block1, 30, 0.001)
+            adv_frequency_fgsm = fgsm_attack(HH_block1, epsilon, grad_HH_block1)
+            adv_frequency_block1 = (adv_frequency_pgd + adv_frequency_fgsm) / 2.0
 
         # add zero_grad
         self.feature.zero_grad()
@@ -404,7 +412,10 @@ class MainMethod(MetaTemplate):
             # fgsm style attack
             index = torch.randint(0, len(epsilon_list), (1,))[0]
             epsilon = epsilon_list[index]
-            adv_frequency_block2 = add_perturbation_high(HH_block2, epsilon, grad_HH_block2)
+
+            adv_frequency_pgd = pgd_attack(HH_block2, epsilon, grad_HH_block2, 30, 0.001)
+            adv_frequency_fgsm = fgsm_attack(HH_block2, epsilon, grad_HH_block2)
+            adv_frequency_block2 = (adv_frequency_pgd + adv_frequency_fgsm) / 2.0
             # print(f"phase_spectrum_block2.grad_fn: {phase_spectrum_block2.grad_fn}")
             # print(f"ori_loss.grad_fn: {ori_loss.grad_fn}")
             # print(f"x_ori_block2.grad_fn: {x_ori_block2.grad_fn}")
@@ -454,7 +465,9 @@ class MainMethod(MetaTemplate):
             # fgsm style attack
             index = torch.randint(0, len(epsilon_list), (1,))[0]
             epsilon = epsilon_list[index]
-            adv_frequency_block3 = add_perturbation_high(HH_block3, epsilon, grad_HH_block3)
+            adv_frequency_pgd = pgd_attack(HH_block3, epsilon, grad_HH_block3, 30, 0.001)
+            adv_frequency_fgsm = fgsm_attack(HH_block3, epsilon, grad_HH_block3)
+            adv_frequency_block3 = (adv_frequency_pgd + adv_frequency_fgsm) / 2.0
         # print("++++++++++++++++++++++++",adv_frequency_block1, adv_frequency_block2, adv_frequency_block3)
 
         return adv_frequency_block1, adv_frequency_block2, adv_frequency_block3
@@ -540,9 +553,6 @@ class MainMethod(MetaTemplate):
 
         x_adv_fea_low = self.feature.forward_rest(x_adv_block4_new)
 
-        x_adv_fea_low_hat = mutual_attention(x_ori_fea, x_adv_fea_low) + mutual_attention(x_adv_fea_low,
-                                                                                            x_ori_fea) + x_adv_fea_low
-
         # Apply perturbation
         LL_block1, HH_block1, = extract_high_low_frequency_components(x_adv_block1)
         x_adv_block1_newFrequency = reconstruct_feature(LL_block1, adv_high_frequency_block1)
@@ -558,15 +568,22 @@ class MainMethod(MetaTemplate):
 
         x_adv_fea_high = self.feature.forward_rest(x_adv_block4_new)
 
-        x_adv_fea_high_hat=mutual_attention(x_ori_fea, x_adv_fea_high) + mutual_attention(x_adv_fea_high, x_ori_fea) + x_adv_fea_high
-
+        # x_adv_fea_low_hat = mutual_attention(x_adv_fea_high, x_adv_fea_low) + mutual_attention(x_adv_fea_low,
+        #                                                                                        x_adv_fea_high) + x_adv_fea_low
+        #
+        # x_adv_fea_high_hat = mutual_attention(x_adv_fea_low, x_adv_fea_high) + mutual_attention(x_adv_fea_high,
+        #                                                                                         x_adv_fea_low) + x_adv_fea_high
+        x_adv_fea_low_hat = x_adv_fea_low
+        x_adv_fea_high_hat = x_adv_fea_high
         # adv cls global loss
-        scores_cls_adv = self.classifier.forward(low_freq_ratio * x_adv_fea_low_hat + high_freq_ratio * 2 * x_adv_fea_high_hat)
+        scores_cls_adv = self.classifier.forward(
+            low_freq_ratio * x_adv_fea_low_hat + high_freq_ratio * 100 * x_adv_fea_high_hat)
         loss_cls_adv = self.loss_fn(scores_cls_adv, global_y)
-        acc_cls_adv = (scores_cls_adv.max(1, keepdim=True)[1] == global_y).type(torch.float).sum().item() / global_y.size()[0]
+        acc_cls_adv = (scores_cls_adv.max(1, keepdim=True)[1] == global_y).type(torch.float).sum().item() / \
+                      global_y.size()[0]
 
         # adv FSL scores and losses
-        x_adv_z = self.fc(low_freq_ratio * x_adv_fea_low_hat + high_freq_ratio * 2 * x_adv_fea_high_hat)
+        x_adv_z = self.fc(low_freq_ratio * x_adv_fea_low_hat + high_freq_ratio * 10 * x_adv_fea_high_hat)
         x_adv_z = x_adv_z.view(self.n_way, -1, x_adv_z.size(1))
         x_adv_z_stack = [
             torch.cat([x_adv_z[:, :self.n_support], x_adv_z[:, self.n_support + i:self.n_support + i + 1]], dim=1).view(

@@ -96,7 +96,7 @@ class MetaTemplate(nn.Module):
 
             optimizer.zero_grad()
 
-            epsilon_list = [0.001, 0.01, 0.001]
+            epsilon_list = [0.1, 0.01, 0.001]
 
             # 计算原始和对抗样本的损失
             scores_fsl_ori, loss_fsl_ori, scores_cls_ori, loss_cls_ori, scores_fsl_adv, loss_fsl_adv, scores_cls_adv, loss_cls_adv = self.set_forward_loss_method(epoch,
@@ -114,7 +114,7 @@ class MetaTemplate(nn.Module):
                 loss_cls_KL = consistency_loss(scores_cls_ori, scores_cls_adv, 'KL3')
 
             # 计算最终的损失
-            k1, k2, k3, k4, k5, k6 = 1, 1, 1, 1, 1, 1
+            k1, k2, k3, k4, k5, k6 = 1, 1, 1, 1, 0, 0
             loss = k1 * loss_fsl_ori + k2 * loss_fsl_adv + k3 * loss_fsl_KL + k4 * loss_cls_ori + k5 * loss_cls_adv + k6 * loss_cls_KL
 
             # 反向传播和优化
@@ -128,7 +128,11 @@ class MetaTemplate(nn.Module):
             if (i + 1) % print_freq == 0:
                 print('Epoch {:d} | Batch {:d}/{:d} | Loss {:f}'.format(epoch, i + 1, len(train_loader_ori),
                                                                         avg_loss / float(i + 1)))
-
+                print(
+                    'loss_fsl_ori {:f} | loss_fsl_adv {:f} | loss_fsl_KL {:f} | loss_cls_ori {:f}'.format(loss_fsl_ori,
+                                                                                                          loss_fsl_adv,
+                                                                                                          loss_fsl_KL,
+                                                                                                          loss_cls_ori))
             # 记录 TensorBoard 日志
             if (total_it + 1) % 10 == 0 and self.tf_writer is not None:
                 self.tf_writer.add_scalar('loss_fsl_ori:', loss_fsl_ori.item(), total_it + 1)

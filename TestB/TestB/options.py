@@ -33,7 +33,7 @@ def parse_args(script):
         parser.add_argument('--target_num_label', default=5, type=int,
                             help='number of labeled target base images per class')
         parser.add_argument('--start_epoch', default=0, type=int, help='Starting epoch')
-        parser.add_argument('--stop_epoch', default=600, type=int, help='Stopping epoch')
+        parser.add_argument('--stop_epoch', default=200, type=int, help='Stopping epoch')
         parser.add_argument('--resume', default='', type=str,
                             help='continue from previous trained model with largest epoch')
         parser.add_argument('--lr', default=5e-4, type=float, help='lr')

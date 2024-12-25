@@ -10,11 +10,18 @@ from data.datamgr import SetDataManager
 from methods.main_method import MainMethod
 
 from options import parse_args, get_resume_file, load_warmup_state
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import StepLR
+
+def print_gradients(model):
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(f"Layer: {name}, Gradient: {param.grad}")
+
 
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     # get optimizer and checkpoint path
     optimizer = torch.optim.Adam(model.parameters(), lr=0.004)
+    scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
     # optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
     # scheduler = ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.1)
     if not os.path.isdir(params.checkpoint_dir):
@@ -29,6 +36,7 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
         model.train()
         total_it = model.train_loop(epoch, base_loader, optimizer,
                                     total_it)  # model are called by reference, no need to return
+        # print_gradients(model)  # 打印梯度值
         model.eval()
 
         acc = model.test_loop(val_loader)
@@ -39,9 +47,9 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
             torch.save({'epoch': epoch, 'state': model.state_dict()}, outfile)
         else:
             print("GG! best accuracy {:f}".format(max_acc))
+
         # 在每个epoch结束时更新学习率
-        # scheduler.step(epoch_loss)
-        # if ((epoch + 1) % params.save_freq==0) or (epoch==stop_epoch-1):
+        scheduler.step()
         if epoch == stop_epoch - 1:
             outfile = os.path.join(params.checkpoint_dir, '{:d}.tar'.format(epoch))
             torch.save({'epoch': epoch, 'state': model.state_dict()}, outfile)
@@ -51,7 +59,8 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
 # --- main function ---
 if __name__ == '__main__':
     # fix seed
-    seed = 0
+    seed = 2235
+    # seed = random.randint(0, 10000)
     print("set seed = %d" % seed)
     random.seed(seed)
     np.random.seed(seed)

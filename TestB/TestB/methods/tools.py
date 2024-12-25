@@ -77,26 +77,48 @@ def extract_high_low_frequency_components(feature):
     return low_freq, high_freq
 
 
-# 2. 添加扰动
-def add_perturbation(init_input, epsilon, data_grad):
-    # print("init_input.shape",init_input.shape)
-    # random start init_input
-    init_input = init_input + torch.empty_like(init_input).uniform_(-START_EPS, START_EPS)
+def pgd_attack(init_input, epsilon, data_grad, num_steps, START_EPS=0.001):
+    """
+    Projected Gradient Descent (PGD) 对抗样本生成函数（隐式方法）。
 
-    sign_data_grad = data_grad.sign()
-    adv_input = init_input + epsilon * sign_data_grad
-    # print("adv_input.shape",adv_input.shape)
+    Args:
+        init_input: 原始输入数据（Tensor）。
+        epsilon: 扰动的最大范围（L∞ 范数约束）。
+        data_grad: 输入数据的梯度（Tensor）。
+        num_steps: 迭代次数。
+        step_size: 每次迭代的步长。
+        START_EPS: 随机初始化的范围（默认 0.001）。
+
+    Returns:
+        adv_input: 生成的对抗样本。
+    """
+    adv_input = init_input
+    # 随机初始化
+    adv_input = init_input + torch.randn_like(init_input) * START_EPS
+    step_size = epsilon / num_steps
+
+    # 迭代生成对抗样本
+    for _ in range(num_steps):
+        # 获取梯度符号
+        sign_data_grad = data_grad.sign()
+
+        # 更新对抗样本
+        adv_input = adv_input + step_size * sign_data_grad
+
+        # 投影到 epsilon 范围内
+        adv_input = torch.max(torch.min(adv_input, init_input + epsilon), init_input - epsilon)
+
+
     return adv_input
 
 
 # 2. 添加扰动
-def add_perturbation_high(init_input, epsilon, data_grad):
+def fgsm_attack(init_input, epsilon, data_grad):
     # print("init_input.shape",init_input.shape)
-    # random start init_input
-    init_input = init_input + torch.empty_like(init_input).uniform_(-START_EPS, START_EPS)
+    init_input = init_input + torch.randn_like(init_input) * 1
 
     sign_data_grad = data_grad.sign()
-    adv_input = init_input + 0.2 * epsilon * sign_data_grad
+    adv_input = init_input + 1 * epsilon * sign_data_grad
     # print("adv_input.shape",adv_input.shape)
     return adv_input
 
@@ -117,12 +139,31 @@ def reconstruct_feature(low_freq, high_freq):
 
 
 def mutual_attention(q, k):
-    assert (q.size() == k.size())
-    weight = q.mul(k)
-    weight_sig = torch.sigmoid(weight)
-    v = k.mul(weight_sig)
-    return v
+    """
+    复杂互注意力机制：结合加权和规范化操作，支持更灵活的关系建模。
 
+    Args:
+        q: 查询张量（Tensor）。形状为 [batch_size, seq_len, d_model]
+        k: 键张量（Tensor）。形状为 [batch_size, seq_len, d_model]
+
+    Returns:
+        v: 加权后的输出张量，形状与 k 相同。
+    """
+    assert q.size() == k.size(), "q and k must have the same shape"
+
+    # 计算注意力权重（逐元素相乘并进行规范化）
+    weight = q * k
+
+    # 规范化权重：沿着特定维度进行 softmax
+    weight_norm = F.softmax(weight, dim=-1)
+
+    # 使用规范化权重加权键张量
+    v = weight_norm * k
+
+    # 可选：引入额外的非线性激活函数（如 ReLU 或 GELU）
+    v = F.relu(v)
+
+    return v
 
 def consistency_loss(scoresM1, scoresM2, type='euclidean'):
     if (type == 'euclidean'):
