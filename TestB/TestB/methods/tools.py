@@ -51,6 +51,11 @@ def loss_fn_example(phase):
     return torch.sum(phase ** 2)
 
 
+def reparameterize( mu, std, epsilon_norm):
+    """实现重参数化技巧"""
+    return mu + std * epsilon_norm
+
+
 # 1. 高频和低频分量提取
 def extract_high_low_frequency_components(feature):
     """
@@ -76,6 +81,54 @@ def extract_high_low_frequency_components(feature):
 
     return low_freq, high_freq
 
+
+def add_noise_to_freq(freq, gauss_or_uniform=0, h_start=0, h_crop=32, w_start=0, w_crop=32,eps=1e-8):
+    """
+    在低频分量 (LL) 上添加噪声。
+
+    参数：
+    low_freq (Tensor): 低频分量张量，形状为 (N, C, H, W)，N 为批量大小，C 为通道数，H 和 W 为特征图的高度和宽度。
+    gauss_or_uniform (int): 指定噪声类型，0 表示高斯噪声，1 表示均匀噪声，其他值默认为高斯噪声。
+    h_start, h_crop, w_start, w_crop (int): 定义裁剪窗口的位置和大小。
+
+    返回：
+    Tensor: 添加噪声后的低频分量。
+    """
+    B, C, H, W = freq.shape
+
+    # 计算局部均值和标准差
+    miu = torch.mean(freq, dim=(2, 3), keepdim=True)
+    var = torch.var(freq, dim=(2, 3), keepdim=True)
+    sig = (var + eps).sqrt()
+
+    # 计算均值和标准差的方差
+    var_of_miu = torch.var(miu, dim=0, keepdim=True)
+    var_of_sig = torch.var(sig, dim=0, keepdim=True)
+    sig_of_miu = (var_of_miu + eps).sqrt().repeat(B, 1, 1, 1)
+    sig_of_sig = (var_of_sig + eps).sqrt().repeat(B, 1, 1, 1)
+
+    if gauss_or_uniform == 0:
+        epsilon_norm_miu = torch.randn_like(sig_of_miu)  # 高斯噪声 N(0,1)
+        epsilon_norm_sig = torch.randn_like(sig_of_sig)
+        beta = reparameterize(mu=miu, std=sig_of_miu, epsilon_norm=epsilon_norm_miu)
+        gamma = reparameterize(mu=sig, std=sig_of_sig, epsilon_norm=epsilon_norm_sig)
+    elif gauss_or_uniform == 1:
+        epsilon_norm_miu = torch.rand_like(sig_of_miu) * 2 - 1.  # 均匀噪声 U(-1,1)
+        epsilon_norm_sig = torch.rand_like(sig_of_sig) * 2 - 1.
+        beta = reparameterize(mu=miu, std=sig_of_miu, epsilon_norm=epsilon_norm_miu)
+        gamma = reparameterize(mu=sig, std=sig_of_sig, epsilon_norm=epsilon_norm_sig)
+    else:
+        epsilon_norm_miu = torch.randn_like(sig_of_miu)  # 默认为高斯噪声
+        epsilon_norm_sig = torch.randn_like(sig_of_sig)
+        beta = reparameterize(mu=miu, std=1., epsilon_norm=epsilon_norm_miu)
+        gamma = reparameterize(mu=sig, std=1., epsilon_norm=epsilon_norm_sig)
+
+    # 调整每个样本的统计信息
+    img_abs = freq.clone()
+    img_abs = \
+        gamma * (img_abs - miu) / sig + beta
+
+    return img_abs
 
 def pgd_attack(init_input, epsilon, data_grad, num_steps, START_EPS=0.001):
     """
@@ -107,7 +160,6 @@ def pgd_attack(init_input, epsilon, data_grad, num_steps, START_EPS=0.001):
 
         # 投影到 epsilon 范围内
         adv_input = torch.max(torch.min(adv_input, init_input + epsilon), init_input - epsilon)
-
 
     return adv_input
 
@@ -164,6 +216,7 @@ def mutual_attention(q, k):
     v = F.relu(v)
 
     return v
+
 
 def consistency_loss(scoresM1, scoresM2, type='euclidean'):
     if (type == 'euclidean'):

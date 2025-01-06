@@ -9,15 +9,15 @@ def parse_args(script):
     parser = argparse.ArgumentParser(description='few-shot script %s' % (script))
     parser.add_argument('--dataset', default='miniImagenet',
                         help='miniImagenet/cub/cars/places/plantae/CropDiseases/EuroSAT/ISIC/chestX')
-    parser.add_argument('--testset', default='miniImagenet',
+    parser.add_argument('--testset', default='ISIC',
                         help='miniImagenet/cub/cars/places/plantae/CropDiseases/EuroSAT/ISIC/chestX')
     parser.add_argument('--model', default='ResNet10',
-                        help='model: Conv{4|6} / ResNet{10|18|34}')  # we use ResNet10 in the paper
+                        help='model: Conv{4|6} / ResNet{10|18|34}')
     parser.add_argument('--method', default='baseline',
                         help='baseline/baseline++/protonet/matchingnet/relationnet{_softmax}/gnnnet')
     parser.add_argument('--train_n_way', default=5, type=int, help='class num to classify for training')
     parser.add_argument('--test_n_way', default=5, type=int, help='class num to classify for testing (validation) ')
-    parser.add_argument('--n_shot', default=5, type=int, help='number of labeled data in each class, same as n_support')
+    parser.add_argument('--n_shot', default=1, type=int, help='number of labeled data in each class, same as n_support')
     parser.add_argument('--train_aug', action='store_true', help='perform data augmentation or not during training ')
     parser.add_argument('--name', default='tmp', type=str, help='')
     parser.add_argument('--save_dir', default='./output', type=str, help='')

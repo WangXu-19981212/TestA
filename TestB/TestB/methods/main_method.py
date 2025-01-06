@@ -162,6 +162,7 @@ class MainMethod(MetaTemplate):
             x_ori_block1 = self.feature.forward_block1(x_ori)
             feat_size_block1 = x_ori_block1.size()
             LL_block1, HH_block1 = extract_high_low_frequency_components(x_ori_block1)
+            LL_block1 = add_noise_to_freq(freq=LL_block1, gauss_or_uniform=0, h_start=0, h_crop=32, w_start=0, w_crop=32)
             LL_block1 = torch.nn.Parameter(LL_block1)
             LL_block1.requires_grad_(True)
 
@@ -213,6 +214,8 @@ class MainMethod(MetaTemplate):
             x_ori_block2 = self.feature.forward_block2(x_ori_block1)
             # calculate phase spectrum
             LL_block2, HH_block2 = extract_high_low_frequency_components(x_ori_block2)
+            LL_block2 = add_noise_to_freq(freq=LL_block2, gauss_or_uniform=0, h_start=0, h_crop=32, w_start=0,
+                                          w_crop=32)
             LL_block2 = torch.nn.Parameter(LL_block2)
             LL_block2.requires_grad_(True)
             # set them as learnable parameters
@@ -264,6 +267,9 @@ class MainMethod(MetaTemplate):
             x_ori_block3 = self.feature.forward_block3(x_ori_block2)
             # calculate phase spectrum
             LL_block3, HH_block3, = extract_high_low_frequency_components(x_ori_block3)
+            LL_block3 = add_noise_to_freq(freq=LL_block3, gauss_or_uniform=0, h_start=0, h_crop=32, w_start=0,
+                                          w_crop=32)
+
             LL_block3 = torch.nn.Parameter(LL_block3)
             LL_block3.requires_grad_(True)
 
@@ -328,6 +334,9 @@ class MainMethod(MetaTemplate):
             x_ori_block1 = self.feature.forward_block1(x_ori)
             feat_size_block1 = x_ori_block1.size()
             LL_block1, HH_block1 = extract_high_low_frequency_components(x_ori_block1)
+            # HH_block1 = add_noise_to_freq(freq=HH_block1, gauss_or_uniform=0, h_start=0, h_crop=32, w_start=0,
+            #                               w_crop=32)
+
             HH_block1 = torch.nn.Parameter(HH_block1)
             HH_block1.requires_grad_(True)
 
@@ -379,6 +388,8 @@ class MainMethod(MetaTemplate):
             x_ori_block2 = self.feature.forward_block2(x_ori_block1)
             # calculate phase spectrum
             LL_block2, HH_block2 = extract_high_low_frequency_components(x_ori_block2)
+            # HH_block2 = add_noise_to_freq(freq=HH_block2, gauss_or_uniform=0, h_start=0, h_crop=32, w_start=0,
+            #                               w_crop=32)
             HH_block2 = torch.nn.Parameter(HH_block2)
             HH_block2.requires_grad_(True)
             # set them as learnable parameters
@@ -431,6 +442,8 @@ class MainMethod(MetaTemplate):
             x_ori_block3 = self.feature.forward_block3(x_ori_block2)
             # calculate phase spectrum
             LL_block3, HH_block3, = extract_high_low_frequency_components(x_ori_block3)
+            # HH_block3 = add_noise_to_freq(freq=HH_block3, gauss_or_uniform=0, h_start=0, h_crop=32, w_start=0,
+            #                               w_crop=32)
             HH_block3 = torch.nn.Parameter(HH_block3)
             HH_block3.requires_grad_(True)
 
@@ -568,16 +581,17 @@ class MainMethod(MetaTemplate):
 
         x_adv_fea_high = self.feature.forward_rest(x_adv_block4_new)
 
-        # x_adv_fea_low_hat = mutual_attention(x_adv_fea_high, x_adv_fea_low) + mutual_attention(x_adv_fea_low,
-        #                                                                                        x_adv_fea_high) + x_adv_fea_low
-        #
-        # x_adv_fea_high_hat = mutual_attention(x_adv_fea_low, x_adv_fea_high) + mutual_attention(x_adv_fea_high,
-        #                                                                                         x_adv_fea_low) + x_adv_fea_high
-        x_adv_fea_low_hat = x_adv_fea_low
-        x_adv_fea_high_hat = x_adv_fea_high
+        x_adv_fea_low_hat = mutual_attention(x_adv_fea_high, x_adv_fea_low) + x_adv_fea_low
+
+        x_adv_fea_high_hat = mutual_attention(x_adv_fea_low, x_adv_fea_high) + x_adv_fea_high
+        if torch.equal(x_adv_fea_high_hat, torch.zeros_like(x_adv_fea_high_hat)):
+            print("x_adv_fea_high_hat is all zeros.")
+        else:
+            pass
+
         # adv cls global loss
         scores_cls_adv = self.classifier.forward(
-            low_freq_ratio * x_adv_fea_low_hat + high_freq_ratio * 100 * x_adv_fea_high_hat)
+            low_freq_ratio * x_adv_fea_low_hat + high_freq_ratio * 0 * x_adv_fea_high_hat)
         loss_cls_adv = self.loss_fn(scores_cls_adv, global_y)
         acc_cls_adv = (scores_cls_adv.max(1, keepdim=True)[1] == global_y).type(torch.float).sum().item() / \
                       global_y.size()[0]

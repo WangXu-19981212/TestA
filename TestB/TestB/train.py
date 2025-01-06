@@ -12,10 +12,48 @@ from methods.main_method import MainMethod
 from options import parse_args, get_resume_file, load_warmup_state
 from torch.optim.lr_scheduler import StepLR
 
+
 def print_gradients(model):
     for name, param in model.named_parameters():
         if param.requires_grad:
             print(f"Layer: {name}, Gradient: {param.grad}")
+
+
+class EarlyStopping:
+    def __init__(self, patience=30, delta=0, verbose=False):
+        """
+        Args:
+            patience (int): 允许验证集性能不提升的轮数。
+            delta (float): 认为性能提升的最小变化量。
+            verbose (bool): 是否打印日志。
+        """
+        self.patience = patience
+        self.delta = delta
+        self.verbose = verbose
+        self.counter = 0
+        self.best_score = None
+        self.early_stop = False
+
+    def __call__(self, val_loss, model, checkpoint_dir, epoch):
+        if self.best_score is None:
+            self.best_score = val_loss
+            self.save_checkpoint(val_loss, model, checkpoint_dir, epoch)
+        elif val_loss > self.best_score + self.delta:
+            self.counter += 1
+            if self.verbose:
+                print(f'EarlyStopping counter: {self.counter}/{self.patience}')
+            if self.counter >= self.patience:
+                self.early_stop = True
+        else:
+            self.best_score = val_loss
+            self.save_checkpoint(val_loss, model, checkpoint_dir, epoch)
+            self.counter = 0
+
+    def save_checkpoint(self, val_loss, model, checkpoint_dir, epoch):
+        """保存验证集性能最好的模型权重。"""
+        if self.verbose:
+            print(f'Validation loss decreased ({self.best_score:.6f} --> {val_loss:.6f}). Saving model...')
+        torch.save({'epoch': epoch, 'state': model.state_dict()}, os.path.join(checkpoint_dir, 'best_model.tar'))
 
 
 def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
@@ -30,6 +68,8 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
     # for validation
     max_acc = 0
     total_it = 0
+    # 初始化早停
+    early_stopping = EarlyStopping(patience=40, verbose=True)
 
     # start
     for epoch in range(start_epoch, stop_epoch):
@@ -47,6 +87,12 @@ def train(base_loader, val_loader, model, start_epoch, stop_epoch, params):
             torch.save({'epoch': epoch, 'state': model.state_dict()}, outfile)
         else:
             print("GG! best accuracy {:f}".format(max_acc))
+
+        # 早停判断
+        early_stopping(-acc, model, params.checkpoint_dir, epoch)  # 使用负准确率作为损失值
+        if early_stopping.early_stop:
+            print("Early stopping triggered.")
+            break
 
         # 在每个epoch结束时更新学习率
         scheduler.step()
